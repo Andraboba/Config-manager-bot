@@ -2,29 +2,45 @@ package com.petr.db.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "config")
-@Getter @Setter
-@RequiredArgsConstructor
+@Table(
+        name = "config",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "config_tg_id_country_unique", columnNames = {"tg_id", "country"})
+        }
+)
+@Getter
+@Setter
+@NoArgsConstructor
 public class Config {
-    @Column(name = "sub_link", nullable = false, length = Integer.MAX_VALUE)
-    private String subLink;
-
-    @Column(name = "vless_link", nullable = false, length = Integer.MAX_VALUE)
-    private String vlessLink;
-
-    @Column(name = "config_name", nullable = false, length = Integer.MAX_VALUE)
-    private String configName;
-
-    @MapsId
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tg_id", nullable = false)
-    private User tgUser;
 
     @Id
-    @Column(name = "tg_id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tg_id", nullable = false, foreignKey = @ForeignKey(name = "fk_tg_id"))
+    private User tgUser;
+
+    @Column(name = "config_name", nullable = false)
+    private String configName;
+
+    @Column(name = "vless_link")
+    private String vlessLink;
+
+    @Column(name = "sub_link", nullable = false)
+    private String subLink;
+
+    @Column(name = "xhttp_link")
+    private String xhttpLink;
+
+    @Column(name = "country", nullable = false, length = 10)
+    private String country = "latv";
+
+    @Column(name = "status", nullable = false, length = 5)
+    private String status = "w";
 }

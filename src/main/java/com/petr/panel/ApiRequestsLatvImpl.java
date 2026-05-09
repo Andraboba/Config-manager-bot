@@ -1,5 +1,8 @@
 package com.petr.panel;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petr.exception.DuplicateEmailException;
 import com.petr.exception.LoginException;
 import com.petr.exception.RequestException;
 import com.petr.exception.RetryAttemptsLeftException;
@@ -15,16 +18,24 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-public class ApiRequestsLatvImpl implements ApiRequests{
-    private final int MAX_RETRIES = 2;
+public class ApiRequestsLatvImpl implements ApiRequests {
+
+    private static final int MAX_RETRIES = 2;
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
     @FunctionalInterface
     private interface ThrowingSupplier<T> {
         T get() throws Exception;
     }
 
+    private final ObjectMapper mapper = new ObjectMapper();
     private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
-    private final HttpClient client = HttpClient.newBuilder().cookieHandler(cookies).build();
-    private URI baseUri = URI.create(System.getenv("LATV_PANEL_HOME_URL"));
+    private final HttpClient client = HttpClient.newBuilder()
+            .cookieHandler(cookies)
+            .version(HttpClient.Version.HTTP_1_1)   // HTTP/2 вызывает проблемы с некоторыми 3x-ui
+            .build();
+    private final URI baseUri;
+
     private final String settingsTemplate = "{\"clients\": [{ " +
             "\"id\": \"%s\", " +
             "\"flow\": \"\", " +
@@ -38,115 +49,152 @@ public class ApiRequestsLatvImpl implements ApiRequests{
             "\"comment\": \"created from tg bot\", " +
             "\"reset\": 0 }]}";
 
-    public void ApiRequests() throws IOException, InterruptedException {
-        login();
+    public ApiRequestsLatvImpl() {
+        String url = System.getenv("LATV_PANEL_HOME_URL");
+        if (!url.endsWith("/")) url = url + "/";
+        this.baseUri = URI.create(url);
+        System.out.println("[ApiLatv] baseUri=" + baseUri);
+        // Логинимся сразу при старте
+        try {
+            login();
+        } catch (Exception e) {
+            System.out.println("[ApiLatv] Начальный логин не удался: " + e.getMessage());
+        }
     }
 
-    private <T> T executeWithRetry(ApiRequestsLatvImpl.ThrowingSupplier<T> requestToRetry) throws IOException, InterruptedException {
+    // ── Retry-обёртка ───────────────────────────────────────────────────────
+
+    private <T> T executeWithRetry(ThrowingSupplier<T> request) throws IOException, InterruptedException {
         int attempts = 0;
         Exception lastException = null;
 
-        while(attempts < MAX_RETRIES){
+        while (attempts < MAX_RETRIES) {
             try {
-                return requestToRetry.get();
-            } catch(RequestException requestEx){
-                lastException = requestEx;
-                System.out.println("Request failed: " + requestEx.getMessage() + ", status=" + requestEx.getStatusCode());
-                login();
-            } catch(LoginException loginEx){
-                lastException = loginEx;
-                System.out.println("Login failed: " + loginEx.getMessage() + ", status=" + loginEx.getStatusCode());
-            }
-            catch(Exception ex) {
+                return request.get();
+            } catch (RequestException ex) {
                 lastException = ex;
-                System.out.println("Unhandled exception: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
+                System.out.println("[ApiLatv] Запрос упал: " + ex.getMessage() + ", пробую перелогиниться...");
+                try {
+                    login();
+                } catch (LoginException le) {
+                    lastException = le;
+                    System.out.println("[ApiLatv] Логин упал: " + le.getMessage());
+                }
+            } catch (LoginException ex) {
+                lastException = ex;
+                System.out.println("[ApiLatv] Логин упал: " + ex.getMessage());
+            } catch (DuplicateEmailException ex) {
+                throw ex; // бизнес-ошибка панели — retry не поможет
+            } catch (Exception ex) {
+                lastException = ex;
+                System.out.println("[ApiLatv] Необработанное исключение: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
             }
             attempts++;
         }
 
-        String reason = lastException == null ? "unknown reason"
+        String reason = lastException == null ? "неизвестная причина"
                 : lastException.getClass().getSimpleName() + ": " + lastException.getMessage();
-        throw new RetryAttemptsLeftException("Too many attempts. Last error: " + reason,  MAX_RETRIES);
+        throw new RetryAttemptsLeftException("Too many attempts. Last error: " + reason, MAX_RETRIES);
     }
+
+    // ── Логин ───────────────────────────────────────────────────────────────
 
     private void login() throws LoginException, IOException, InterruptedException {
         String username = System.getenv("XUI_USERNAME_LATV");
         String password = System.getenv("XUI_PASSWORD_LATV");
 
         URI loginUri = baseUri.resolve("login");
+        System.out.println("[ApiLatv] login → " + loginUri + " (user='" + username + "')");
+
         String body = "username=" + URLEncoder.encode(username, StandardCharsets.UTF_8) +
                 "&password=" + URLEncoder.encode(password, StandardCharsets.UTF_8);
 
         HttpRequest request = HttpRequest.newBuilder(loginUri)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("User-Agent", USER_AGENT)
                 .build();
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("[ApiLatv] login status=" + response.statusCode() + " body=" + response.body());
 
-        if(response.statusCode() != 200){
-            System.out.println(response.statusCode());
-            System.out.println(response.headers());
-            System.out.println(response.body());
-            System.out.println(response);
-            throw new LoginException("Login failed: ", response.statusCode());
+        if (response.statusCode() != 200) {
+            throw new LoginException("HTTP " + response.statusCode(), response.statusCode());
         }
-        else{
-            System.out.println(response.statusCode());
-            System.out.println(response.headers());
-            System.out.println(response.body());
+
+        try {
+            JsonNode json = mapper.readTree(response.body());
+            if (!json.path("success").asBoolean(false)) {
+                String msg = json.path("msg").asText("неверные credentials");
+                throw new LoginException("success=false: " + msg, response.statusCode());
+            }
+        } catch (LoginException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new LoginException("Не удалось разобрать ответ логина: " + e.getMessage(), response.statusCode());
         }
+
+        System.out.println("[ApiLatv] login OK, cookies=" + cookies.getCookieStore().getCookies());
     }
 
+    // ── API-методы ──────────────────────────────────────────────────────────
+
     @Override
-    public String addClientRequest(String inboundId, UUID uuid, UUID subUuid, String configName, long tgId) throws IOException, InterruptedException {
-        return executeWithRetry(()-> {
-            URI addClientUrl = baseUri.resolve("panel/api/inbounds/addClient");
-
-            String settings = String.format(settingsTemplate, uuid.toString(), configName, tgId, subUuid);
-
+    public String addClientRequest(String inboundId, UUID uuid, UUID subUuid, String configName, long tgId)
+            throws IOException, InterruptedException {
+        return executeWithRetry(() -> {
+            URI url = baseUri.resolve("panel/api/inbounds/addClient");
+            String settings = String.format(settingsTemplate, uuid, configName, tgId, subUuid);
             String body = "id=" + URLEncoder.encode(inboundId, StandardCharsets.UTF_8) +
                     "&settings=" + URLEncoder.encode(settings, StandardCharsets.UTF_8);
 
-            HttpRequest request = HttpRequest.newBuilder(addClientUrl)
+            HttpRequest request = HttpRequest.newBuilder(url)
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .header("Content-Type", "application/x-www-form-urlencoded")
+                    .header("User-Agent", USER_AGENT)
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("[ApiLatv] addClient inbound=" + inboundId +
+                    " status=" + response.statusCode() + " body=" + response.body());
 
-            if(response.statusCode() == 200){
-                return "конфиг удачно добавлен на панель!";
-            }
-
-            if(response.statusCode() == 404){
+            if (response.statusCode() != 200) {
                 throw new RequestException(
-                        "LATV addClient returned 404. url=" + addClientUrl + ", body=" + response.body(),
+                        "addClient HTTP " + response.statusCode() + " body=" + response.body(),
                         response.statusCode()
                 );
             }
 
-            throw new RequestException(
-                    "Unexpected status from LATV addClient. status=" + response.statusCode() + ", url=" + addClientUrl + ", body=" + response.body(),
-                    response.statusCode()
-            );
+            JsonNode json = mapper.readTree(response.body());
+            if (json.path("success").asBoolean(false)) {
+                return "конфиг удачно добавлен на панель (inbound=" + inboundId + ")!";
+            }
+            String msg = json.path("msg").asText("неизвестная ошибка панели");
+            if (msg.contains("Duplicate email")) {
+                String email = msg.replaceAll(".*Duplicate email:\\s*", "").trim()
+                        .replaceAll("\\s*\\n.*", "");
+                throw new DuplicateEmailException(email);
+            }
+            throw new RequestException("addClient success=false inbound=" + inboundId + ": " + msg, 200);
         });
     }
 
     @Override
     public HttpResponse<String> getAllConfigsRequest() throws IOException, InterruptedException {
-        return executeWithRetry(() ->{
-            URI getConfigsUrl = baseUri.resolve("panel/api/inbounds/list");
-            System.out.println(getConfigsUrl);
-            HttpRequest request = HttpRequest.newBuilder(getConfigsUrl)
+        return executeWithRetry(() -> {
+            URI url = baseUri.resolve("panel/api/inbounds/list");
+            System.out.println("[ApiLatv] getAllConfigs → " + url);
+
+            HttpRequest request = HttpRequest.newBuilder(url)
                     .GET()
-                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .header("User-Agent", USER_AGENT)
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("[ApiLatv] getAllConfigs status=" + response.statusCode());
 
-            if(response.statusCode() != 200){
-                throw new RequestException("Bad status", response.statusCode());
+            if (response.statusCode() != 200) {
+                throw new RequestException("HTTP " + response.statusCode() + " body=" + response.body(), response.statusCode());
             }
             return response;
         });
@@ -155,19 +203,20 @@ public class ApiRequestsLatvImpl implements ApiRequests{
     @Override
     public String deleteClient(String inboundId, String configName) throws IOException, InterruptedException {
         return executeWithRetry(() -> {
-            URI deleteClientUrl = baseUri.resolve(String
-                    .format("panel/api/inbounds/%s/delClientByEmail/%s", inboundId, configName));
+            URI url = baseUri.resolve(String.format("panel/api/inbounds/%s/delClientByEmail/%s", inboundId, configName));
 
-            HttpRequest request = HttpRequest.newBuilder(deleteClientUrl)
+            HttpRequest request = HttpRequest.newBuilder(url)
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .header("Content-Type", "application/x-www-form-urlencoded")
+                    .header("User-Agent", USER_AGENT)
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("[ApiLatv] deleteClient status=" + response.statusCode());
 
-            if(response.statusCode() != 200){
-                throw new RequestException("Bad status", response.statusCode());            }
-
+            if (response.statusCode() != 200) {
+                throw new RequestException("HTTP " + response.statusCode(), response.statusCode());
+            }
             return "Клиент " + configName + " удален!";
         });
     }

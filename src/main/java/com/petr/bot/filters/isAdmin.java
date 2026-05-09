@@ -7,21 +7,29 @@ public class isAdmin implements CustomFilter {
 
     @Override
     public boolean check(Update update) {
-        if (update.message == null || update.message.text == null) {
+        long chatId;
+        if (update.message != null && update.message.text != null) {
+            chatId = update.message.chat.id;
+        } else if (update.callback_query != null && update.callback_query.from != null) {
+            chatId = update.callback_query.from.id;
+        } else {
             return false;
         }
 
-        Long[] adminChats = {
-                Long.parseLong(System.getenv("ADMIN_CHATS").split(",")[0]),
-                Long.parseLong(System.getenv("ADMIN_CHATS").split(",")[1])
-        };
-
-        boolean isAdmin = false;
-
-        if(adminChats[0] == update.message.chat.id || adminChats[1] == update.message.chat.id){
-            isAdmin = true;
+        String env = System.getenv("ADMIN_CHATS");
+        System.out.println("[isAdmin] ADMIN_CHATS env = '" + env + "', chatId=" + chatId);
+        if (env == null || env.isBlank()) {
+            return false;
         }
-
-        return isAdmin;
+        for (String part : env.split(",")) {
+            try {
+                if (Long.parseLong(part.trim()) == chatId) {
+                    System.out.println("[isAdmin] Доступ разрешён для chatId=" + chatId);
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        System.out.println("[isAdmin] chatId=" + chatId + " не найден в ADMIN_CHATS");
+        return false;
     }
 }

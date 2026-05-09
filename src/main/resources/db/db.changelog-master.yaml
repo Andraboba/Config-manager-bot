@@ -6,3 +6,15 @@ databaseChangeLog:
   - include:
       file: changeset/create-config-table.sql
       relativeToChangelogFile: true
+
+  - include:
+      file: changeset/add-xhttp-link.sql
+      relativeToChangelogFile: true
+
+  - include:
+      file: changeset/make-vless-nullable.sql
+      relativeToChangelogFile: true
+
+  - include:
+      file: changeset/restructure-config-multi-country.sql
+      relativeToChangelogFile: true
