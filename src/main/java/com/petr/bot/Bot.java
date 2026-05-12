@@ -15,7 +15,12 @@ import io.github.natanimn.telebof.types.keyboard.InlineKeyboardMarkup;
 import io.github.natanimn.telebof.types.updates.CallbackQuery;
 import io.github.natanimn.telebof.types.updates.Message;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -28,7 +33,8 @@ public class Bot {
             new BotCommand("start", "Запустить бота"),
             new BotCommand("help", "Помощь"),
             new BotCommand("get_config", "Получить конфиг"),
-            new BotCommand("cancel", "Отменить ввод имени конфига")
+            new BotCommand("cancel", "Отменить ввод имени конфига"),
+            new BotCommand("how_to_use", "Показать инструкцию по использованию конфига")
     };
 
     public Bot() {
@@ -65,7 +71,7 @@ public class Bot {
         private static final String ADMIN_HOME_TEXT = "Панель администратора. Выберите действие:";
 
         private static final String GERMANY_WARNING_TEXT = """
-                ⛔ ВНИМАНИЕ — Германский сервер ⛔
+                ⛔ ВНИМАНИЕ — Немецкий сервер ⛔
 
                 Использование торрентов при активном VPN-соединении строго ЗАПРЕЩЕНО.
 
@@ -152,6 +158,26 @@ public class Bot {
                     .replyMarkup(userMainKeyboard()).exec();
         }
 
+        @MessageHandler(commands = "how_to_use")
+        void onHowToUse(BotContext bot, Message message) throws IOException {
+            InputStream is = getClass().getResourceAsStream("/bot-resources/img/how-to-use-1.jpg");
+            if (is == null) throw new RuntimeException("Изображение не найдено в ресурсах!");
+
+            File tempFile = File.createTempFile("how-to-use-1", ".jpg");
+            tempFile.deleteOnExit();
+
+            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                is.transferTo(fos);
+            }
+
+            bot.sendPhoto(message.chat.id, tempFile).caption("""
+            1) Скачайте из Play market/App store приложение Happ
+            2) Копируете любую ссылку начинающуюся на vless:// из сообщения отправленного ботом
+            3) В приложении Happ в левом нижнем углу нажимаем кнопку "буфер обмена" и ссылка должна добавиться
+            4) Если всё пошло хорошо — нажимаем кнопку включения, и всё работает!
+            """).exec();
+        }
+
         @MessageHandler(commands = "help")
         void onHelp(BotContext bot, Message message) {
             bot.sendMessage(message.chat.id, """
@@ -159,6 +185,7 @@ public class Bot {
                     /start — зарегистрироваться и открыть главное меню
                     /get_config — получить конфиг
                     /cancel — отменить ввод имени конфига
+                    /how_to_use - как использовать конфиг
                     """).exec();
         }
 

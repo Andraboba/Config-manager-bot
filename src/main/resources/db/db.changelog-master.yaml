@@ -16,5 +16,9 @@ databaseChangeLog:
       relativeToChangelogFile: true
 
   - include:
+      file: changeset/add-country-to-config.sql
+      relativeToChangelogFile: true
+
+  - include:
       file: changeset/restructure-config-multi-country.sql
       relativeToChangelogFile: true
