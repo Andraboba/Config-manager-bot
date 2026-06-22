@@ -1,4 +1,5 @@
-version: "3.9"
+name: tg-config-bot-prod
+
 services:
 #  TODO переписать под нужды бота
   bot:
@@ -26,6 +27,23 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       ADMIN_CHATS: ${ADMIN_CHATS}
+      LATV_XHTTP_INBOUND_PROD: ${LATV_XHTTP_INBOUND_PROD}
+      LATV_XHTTP_INBOUND_DEV: ${LATV_XHTTP_INBOUND_DEV}
+      LATV_XHTTP_PBK: ${LATV_XHTTP_PBK}
+      LATV_XHTTP_SNI: ${LATV_XHTTP_SNI}
+      LATV_XHTTP_SID: ${LATV_XHTTP_SID}
+      GERM_SERVER_HOST: ${GERM_SERVER_HOST}
+      GERM_WS_PORT: ${GERM_WS_PORT}
+      GERM_XHTTP_PORT: ${GERM_XHTTP_PORT}
+      GERM_SUB_BASE_URL: ${GERM_SUB_BASE_URL}
+      GERM_XHTTP_PBK: ${GERM_XHTTP_PBK}
+      GERM_XHTTP_SNI: ${GERM_XHTTP_SNI}
+      GERM_XHTTP_SID: ${GERM_XHTTP_SID}
+      GERM_XHTTP_FP: ${GERM_XHTTP_FP}
+      GERM_XHTTP_PATH: ${GERM_XHTTP_PATH}
+      GERM_XHTTP_HOST: ${GERM_XHTTP_HOST}
+      GERM_XHTTP_SPX: ${GERM_XHTTP_SPX}
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -39,7 +57,7 @@ services:
       start_period: 20s
 
   db:
-    image: postgres:latest
+    image: postgres:18
     env_file:
       - .env
     environment:
@@ -47,9 +65,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - db-data:/var/lib/db
-    ports:
-      - "5432:5432"
+      - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s

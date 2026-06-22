@@ -38,7 +38,7 @@
             <configuration>
               <transformers>
                 <transformer>
-                  <mainClass>org.example.Execution</mainClass>
+                  <mainClass>com.petr.Start</mainClass>
                 </transformer>
               </transformers>
             </configuration>

@@ -28,6 +28,22 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_NAME=${{ secrets.DB_NAME }}
           ADMIN_CHATS=${{ secrets.ADMIN_CHATS }}
+          LATV_XHTTP_INBOUND_PROD=${{ secrets.LATV_XHTTP_INBOUND_PROD }}
+          LATV_XHTTP_INBOUND_DEV=${{ secrets.LATV_XHTTP_INBOUND_DEV }}
+          LATV_XHTTP_PBK=${{ secrets.LATV_XHTTP_PBK }}
+          LATV_XHTTP_SNI=${{ secrets.LATV_XHTTP_SNI }}
+          LATV_XHTTP_SID=${{ secrets.LATV_XHTTP_SID }}
+          GERM_SERVER_HOST=${{ secrets.GERM_SERVER_HOST }}
+          GERM_WS_PORT=${{ secrets.GERM_WS_PORT }}
+          GERM_XHTTP_PORT=${{ secrets.GERM_XHTTP_PORT }}
+          GERM_SUB_BASE_URL=${{ secrets.GERM_SUB_BASE_URL }}
+          GERM_XHTTP_PBK=${{ secrets.GERM_XHTTP_PBK }}
+          GERM_XHTTP_SNI=${{ secrets.GERM_XHTTP_SNI }}
+          GERM_XHTTP_SID=${{ secrets.GERM_XHTTP_SID }}
+          GERM_XHTTP_FP=${{ secrets.GERM_XHTTP_FP }}
+          GERM_XHTTP_PATH=${{ secrets.GERM_XHTTP_PATH }}
+          GERM_XHTTP_HOST=${{ secrets.GERM_XHTTP_HOST }}
+          GERM_XHTTP_SPX=${{ secrets.GERM_XHTTP_SPX }}
           EOF
 
       - name: Create env.txt for artifacts
@@ -46,6 +62,22 @@ jobs:
             echo "DB_PASSWORD="
             echo "DB_NAME="
             echo "ADMIN_CHATS="
+            echo "LATV_XHTTP_INBOUND_PROD="
+            echo "LATV_XHTTP_INBOUND_DEV="
+            echo "LATV_XHTTP_PBK="
+            echo "LATV_XHTTP_SNI="
+            echo "LATV_XHTTP_SID="
+            echo "GERM_SERVER_HOST="
+            echo "GERM_WS_PORT="
+            echo "GERM_XHTTP_PORT="
+            echo "GERM_SUB_BASE_URL="
+            echo "GERM_XHTTP_PBK="
+            echo "GERM_XHTTP_SNI="
+            echo "GERM_XHTTP_SID="
+            echo "GERM_XHTTP_FP="
+            echo "GERM_XHTTP_PATH="
+            echo "GERM_XHTTP_HOST="
+            echo "GERM_XHTTP_SPX="
           } > env.txt
 
       - name: Docker Compose

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose up *)",
+      "Bash(docker compose ps *)",
+      "Bash(docker compose logs *)",
+      "Bash(mvn clean *)",
+      "PowerShell(cmd /c \"dir \"\"C:\\\\Program Files\\\\JetBrains\"\"\")",
+      "PowerShell(cmd /c \"dir C:\\\\Users\\\\andre\\\\AppData\\\\Local\\\\Programs 2>nul\")",
+      "PowerShell(cmd /c \"dir \"\"C:\\\\Users\\\\andre\\\\AppData\\\\Local\\\\Programs\\\\IntelliJ IDEA\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\"\" 2>nul\")",
+      "PowerShell($mvn = \"\"\"C:\\\\Users\\\\andre\\\\AppData\\\\Local\\\\Programs\\\\IntelliJ IDEA\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\"\"\"; Set-Location \"C:\\\\Users\\\\andre\\\\PycharmProjects\\\\Config-manager-bot\"; & $mvn clean package -DskipTests 2>&1 | Select-Object -Last 30)",
+      "PowerShell($mvn = \"C:\\\\Users\\\\andre\\\\AppData\\\\Local\\\\Programs\\\\IntelliJ IDEA\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\"; Set-Location \"C:\\\\Users\\\\andre\\\\PycharmProjects\\\\Config-manager-bot\"; & $mvn clean package -DskipTests 2>&1 | Select-Object -Last 30)",
+      "Bash(\"C:\\\\Users\\\\andre\\\\AppData\\\\Local\\\\JetBrains\\\\Toolbox\\\\apps\\\\intellij-idea-ultimate\\\\jbr\\\\bin\\\\java\" -version)"
+    ]
+  }
+}
