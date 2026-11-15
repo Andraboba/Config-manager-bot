@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -88,8 +89,11 @@ public final class ScenarioRunner {
                 .inbound(3, 443, "tcp", "reality", true);
         // Финляндия как на сервере: без WS, Reality+Vision на 443 (id 1) и XHTTP (id 2) на 127.0.0.1:20001
         // fallback'ом главного — ссылка XHTTP тоже на 443, inbounds/get/2 отдаёт 20001
+        // Плюс входы переходного периода, как в Германии 15.11: старый Reality (id 5) переехал на 127.0.0.1:4431,
+        // старый XHTTP (id 2) остался на своём порту 54228 — оба работают для старых ссылок, но выдавать их нельзя
         fin = new FakePanel(18085, "fin-token", "fin.test")
-                .inbound(1, 443, "tcp", "reality").inbound(2, 20001, "xhttp", "none").fallback(2, 1);
+                .inbound(8, 443, "tcp", "reality").inbound(7, 20001, "xhttp", "none").fallback(7, 8)
+                .inbound(5, 4431, "tcp", "reality").inbound(2, 54228, "xhttp", "reality");
 
         DatabaseMigration.startMigration(System.getProperty("app.env"));
         db = DriverManager.getConnection(System.getenv("DB_LINK_PROD"), System.getenv("DB_USER"), System.getenv("DB_PASSWORD"));
@@ -153,6 +157,7 @@ public final class ScenarioRunner {
         scenario("Польша: кнопка, отмена, конфиги WS / xHTTP / Оба", ScenarioRunner::polandFlow);
         scenario("Польша: своё одобрение, новые типы без заявки", ScenarioRunner::polandSeparateApproval);
         scenario("Финляндия: без WS — выбор xHTTP / Reality / Все, Vision", ScenarioRunner::finlandFlow);
+        scenario("Переходный период: старые входы клиента работают, бот выдаёт только новые ссылки", ScenarioRunner::transitionLinks);
         scenario("XTLS Vision: новый Reality с flow, старый без flow не трогаем", ScenarioRunner::visionFlow);
 
         scenario("Оба: клавиатура осталась от прошлого запроса (случай с прода)", ScenarioRunner::bothOnStaleKeyboard);
@@ -381,10 +386,33 @@ public final class ScenarioRunner {
         u.press("Отмена");
         check("панель Финляндии не тронута", fin.clients.isEmpty());
 
-        finType("fxh", "xHTTP", ids(2), false, true, false);
-        finType("fre", "Reality", ids(1), false, false, true);
-        finType("fboth", "Все", ids(1, 2), false, true, true);
+        finType("fxh", "xHTTP", ids(7), false, true, false);
+        finType("fre", "Reality", ids(8), false, false, true);
+        finType("fboth", "Все", ids(7, 8), false, true, true);
         check("другие страны не тронуты", latv.clients.isEmpty() && germ.clients.isEmpty() && pol.clients.isEmpty());
+    }
+
+    /**
+     * Германия 15.11: у клиента старые входы (Reality на 127.0.0.1:4431 и XHTTP на 54228) остаются, к ним
+     * добавляются новые (Reality на 443 и XHTTP fallback'ом). Бот должен показать только новые ссылки на 443:
+     * старый XHTTP идёт в списке панели раньше (id 2 &lt; 7), а порт 4431 снаружи закрыт.
+     */
+    private static void transitionLinks() throws Exception {
+        U u = registered("trans");
+        fin.put("trans_config", UUID.randomUUID().toString(), "subtrans01", u.id, 5, 2);
+        u.say("/get_config");
+        u.press("🇫🇮 Финляндия");
+        u.press("Все");
+        check("новые входы привязаны, старые остались", fin.inboundsOf("trans_config").equals(ids(2, 5, 7, 8)));
+        Msg n = notification(ADMIN_A, u.id);
+        if (n != null) adminPress(ADMIN_A, n, "Одобрить");
+        Msg links = lastWith(u.id, "fin.test");
+        check("ссылки после одобрения", links != null);
+        if (links == null) return;
+        expectLinks(links, false, true, true);
+        check("в ответе нет старого Reality на 4431", !links.text.contains(":4431"));
+        check("в ответе нет старого XHTTP на 54228", !links.text.contains(":54228"));
+        check("обе ссылки на 443", links.text.contains("fin.test:443?type=xhttp") && links.text.contains("fin.test:443?type=tcp"));
     }
 
     private static void finType(String name, String button, Set<Integer> inbounds, boolean ws, boolean xhttp, boolean reality) throws Exception {
@@ -394,7 +422,7 @@ public final class ScenarioRunner {
         u.press(button);
         check(button + ": inbound'ы в Финляндии", fin.inboundsOf(name + "_config").equals(inbounds));
         check(button + ": Vision на Reality, на XHTTP flow пустой", inbounds.stream()
-                .allMatch(id -> (id == 1 ? FakePanel.VISION : "").equals(fin.flowOf(name + "_config", id))));
+                .allMatch(id -> (id == 8 ? FakePanel.VISION : "").equals(fin.flowOf(name + "_config", id))));
         FakePanel.Client c = fin.clients.get(name + "_config");
         check(button + ": на панели записан tgId", c != null && c.tgId == u.id);
         Msg n = notification(ADMIN_A, u.id);
