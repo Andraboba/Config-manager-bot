@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -320,6 +321,10 @@ public class PanelServiceImpl implements PanelService {
                 result[slot] = link; // первая ссылка inbound'а — основная
             }
         }
+        // Сначала ссылки на портах настроенных inbound'ов: XHTTP fallback'ом (порт 443 главного) важнее
+        // старого XHTTP-входа на своём порту, который клиенту оставлен на переходный период
+        Set<Integer> knownPorts = new HashSet<>(ports.values());
+        withoutPortMatch.sort(Comparator.comparingInt(link -> knownPorts.contains(linkPort(link)) ? 0 : 1));
         for (String link : withoutPortMatch) {
             int slot = slotByType(link);
             if (slot >= 0 && result[slot] == null) {

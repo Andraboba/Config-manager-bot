@@ -34,6 +34,11 @@ jobs:
           FIN_XHTTP_INBOUND=${{ secrets.FIN_XHTTP_INBOUND }}
           FIN_REALITY_INBOUND=${{ secrets.FIN_REALITY_INBOUND }}
           GERM_WS_INBOUND=${{ secrets.GERM_WS_INBOUND }}
+          LATV_SUB_BASE_URL=${{ secrets.LATV_SUB_BASE_URL }}
+          LATV_XHTTP_INBOUND_PROD=${{ secrets.LATV_XHTTP_INBOUND_PROD }}
+          LATV_REALITY_INBOUND_PROD=${{ secrets.LATV_REALITY_INBOUND_PROD }}
+          GERM_REALITY_INBOUND=${{ secrets.GERM_REALITY_INBOUND }}
+          GERM_XHTTP_INBOUND=${{ secrets.GERM_XHTTP_INBOUND }}
           LATV_WS_INBOUND_PROD=${{ secrets.LATV_WS_INBOUND_PROD }}
           ENABLED_COUNTRIES=${{ secrets.ENABLED_COUNTRIES }}
           DB_LINK_PROD=${{ secrets.DB_LINK_PROD }}
@@ -66,6 +71,11 @@ jobs:
             echo "FIN_XHTTP_INBOUND="
             echo "FIN_REALITY_INBOUND="
             echo "GERM_WS_INBOUND="
+            echo "LATV_SUB_BASE_URL="
+            echo "LATV_XHTTP_INBOUND_PROD="
+            echo "LATV_REALITY_INBOUND_PROD="
+            echo "GERM_REALITY_INBOUND="
+            echo "GERM_XHTTP_INBOUND="
             echo "LATV_WS_INBOUND_PROD="
             echo "ENABLED_COUNTRIES="
             echo "DB_LINK_PROD="

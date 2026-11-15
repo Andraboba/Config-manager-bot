@@ -92,12 +92,13 @@ public class PanelConfig {
 
     /**
      * Латвийская панель (Рига). WS inbound: LATV_WS_INBOUND_PROD/DEV (по умолчанию prod=1 riga-ws, dev=3;
-     * 0 — выключен). XHTTP на Риге нет. Reality inbound: LATV_REALITY_INBOUND_PROD/DEV (по умолчанию prod=8,
-     * в dev — выключен).
+     * 0 — выключен). XHTTP inbound: LATV_XHTTP_INBOUND_PROD/DEV, умолчания нет (пусто или 0 — XHTTP не
+     * используется). Reality inbound: LATV_REALITY_INBOUND_PROD/DEV (по умолчанию prod=8, в dev — выключен).
      */
     public static PanelConfig latv() {
         boolean dev = "dev".equals(System.getProperty("app.env"));
         Integer ws = parseOrDisabled(env(dev ? "LATV_WS_INBOUND_DEV" : "LATV_WS_INBOUND_PROD"), dev ? 3 : 1);
+        Integer xhttp = optionalInbound(dev ? "LATV_XHTTP_INBOUND_DEV" : "LATV_XHTTP_INBOUND_PROD");
         Integer reality = dev
                 ? parseOrNull(env("LATV_REALITY_INBOUND_DEV"))
                 : parseOrDisabled(env("LATV_REALITY_INBOUND_PROD"), 8);
@@ -107,7 +108,7 @@ public class PanelConfig {
                 req("LATV_PANEL_HOME_URL"),
                 req("XUI_API_TOKEN_LATV"),
                 ws,
-                null, // XHTTP на Риге больше нет
+                xhttp,
                 reality,
                 sub
         );
